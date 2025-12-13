@@ -27,6 +27,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<DistributionPlan> DistributionPlans { get; set; }
     public DbSet<Advisor> Advisors { get; set; }
     public DbSet<Manager> Managers { get; set; }
+    public DbSet<DailyTotalEquity> DailyTotalEquities { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -85,6 +86,15 @@ public class ApplicationDbContext : DbContext
             entity.HasIndex(e => e.ProductId);
             entity.HasIndex(e => e.NetValueDate);
             entity.HasIndex(e => new { e.ProductId, e.NetValueDate });
+        });
+
+        // 配置DailyTotalEquity
+        modelBuilder.Entity<DailyTotalEquity>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.TotalAmount).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.Remarks).HasMaxLength(500);
+            entity.HasIndex(e => e.RecordDate).IsUnique();
         });
 
         // 配置HolderShare

@@ -95,6 +95,18 @@ public class NetValuesController : ControllerBase
 
         await _context.SaveChangesAsync();
 
+        // 记录当日总权益（如果该日期还没有记录）
+        // 注意：需要在保存净值后记录，因为此时产品的CurrentNetValue已更新
+        try
+        {
+            await RecordDailyTotalEquity(request.NetValueDate);
+        }
+        catch (Exception ex)
+        {
+            // 记录每日权益失败不影响净值录入的成功
+            Console.WriteLine($"记录每日总权益时出错: {ex.Message}");
+        }
+
         return CreatedAtAction(nameof(GetNetValues), new { productId }, netValue);
     }
 
@@ -151,7 +163,70 @@ public class NetValuesController : ControllerBase
 
         await _context.SaveChangesAsync();
 
+        // 记录每日总权益（对每个净值日期）
+        // 注意：需要在保存净值后记录，因为此时产品的CurrentNetValue已更新
+        try
+        {
+            var uniqueDates = requests.Select(r => r.NetValueDate.Date).Distinct();
+            foreach (var date in uniqueDates)
+            {
+                await RecordDailyTotalEquity(date);
+            }
+        }
+        catch (Exception ex)
+        {
+            // 记录每日权益失败不影响净值导入的成功
+            Console.WriteLine($"记录每日总权益时出错: {ex.Message}");
+        }
+
         return Ok(new { message = $"成功导入 {netValues.Count} 条净值记录" });
+    }
+
+    /// <summary>
+    /// 记录每日总权益
+    /// </summary>
+    private async Task RecordDailyTotalEquity(DateTime recordDate)
+    {
+        try
+        {
+            var dateOnly = recordDate.Date;
+            
+            // 计算所有产品的当前总权益
+            var products = await _context.Products.ToListAsync();
+            var totalAmount = products.Sum(p => p.CurrentNetValue * p.TotalShares);
+            
+            // 检查该日期是否已有记录
+            var existing = await _context.DailyTotalEquities
+                .FirstOrDefaultAsync(e => e.RecordDate.Date == dateOnly);
+            
+            if (existing != null)
+            {
+                // 如果已存在，更新金额
+                existing.TotalAmount = totalAmount;
+                existing.CreatedAt = DateTime.Now;
+            }
+            else
+            {
+                // 如果不存在，创建新记录
+                var dailyEquity = new DailyTotalEquity
+                {
+                    RecordDate = dateOnly,
+                    TotalAmount = totalAmount,
+                    CreatedAt = DateTime.Now
+                };
+                
+                _context.DailyTotalEquities.Add(dailyEquity);
+            }
+            
+            await _context.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            // 如果表不存在或其他错误，记录日志但不抛出异常，避免影响净值录入
+            // 在实际生产环境中，应该使用日志框架记录错误
+            Console.WriteLine($"记录每日总权益失败: {ex.Message}");
+            // 不抛出异常，允许净值录入继续
+        }
     }
 }
 

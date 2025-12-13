@@ -30,10 +30,11 @@ public class DashboardController : ControllerBase
         // 正在运行的产品数（所有产品）
         var activeProductsCount = await _context.Products.CountAsync();
 
-        // 累计产品权益（所有产品的当前总金额之和）
+        // 累计产品权益（所有产品的当前权益之和）
+        // 使用 当前净值 * 总份额 来计算，而不是直接使用 TotalAmount（可能不准确）
         // SQLite 不支持 decimal 类型的 Sum，需要先加载到内存再聚合
-        var products = await _context.Products.Select(p => p.TotalAmount).ToListAsync();
-        var totalProductAmount = products.Sum();
+        var products = await _context.Products.ToListAsync();
+        var totalProductAmount = products.Sum(p => p.CurrentNetValue * p.TotalShares);
 
         // 累计分红金额（所有分红记录的总金额）
         // SQLite 不支持 decimal 类型的 Sum，需要先加载到内存再聚合
@@ -87,7 +88,7 @@ public class DashboardController : ControllerBase
     }
 
     /// <summary>
-    /// 获取最近10周总产品权益变化数据
+    /// 获取最近10周总产品权益变化数据（基于历史记录）
     /// </summary>
     [HttpGet("weekly-amounts")]
     public async Task<ActionResult<IEnumerable<object>>> GetWeeklyAmounts()
@@ -95,64 +96,65 @@ public class DashboardController : ControllerBase
         var today = DateTime.Today;
         var weeks = new List<object>();
 
-        // 获取所有产品
-        var products = await _context.Products.ToListAsync();
+        // 获取所有历史权益记录，按日期排序
+        var allEquityRecords = await _context.DailyTotalEquities
+            .OrderBy(e => e.RecordDate)
+            .ToListAsync();
 
-        // 获取最近10周的数据
-        for (int i = 9; i >= 0; i--)
+        // 如果没有历史记录，返回空数组（只显示第一周）
+        if (allEquityRecords.Count == 0)
         {
-            var weekStart = today.AddDays(-(i * 7 + (int)today.DayOfWeek));
+            return Ok(new List<object>());
+        }
+
+        // 获取最早和最晚的记录日期
+        var earliestDate = allEquityRecords.First().RecordDate.Date;
+        var latestDate = allEquityRecords.Last().RecordDate.Date;
+
+        // 计算需要显示的周数（最多10周，从最早记录开始）
+        var totalDays = (latestDate - earliestDate).Days;
+        var totalWeeks = Math.Min(10, (int)Math.Ceiling(totalDays / 7.0) + 1);
+
+        // 如果总周数少于10周，只显示有数据的周
+        var weeksToShow = Math.Min(10, totalWeeks);
+
+        // 从最早记录开始，按周分组
+        for (int i = 0; i < weeksToShow; i++)
+        {
+            var weekStart = earliestDate.AddDays(i * 7 - (int)earliestDate.DayOfWeek);
             var weekEnd = weekStart.AddDays(6);
 
-            decimal weekTotalAmount = 0;
+            // 获取该周最后一天的权益记录
+            var weekEquity = allEquityRecords
+                .Where(e => e.RecordDate.Date >= weekStart && e.RecordDate.Date <= weekEnd)
+                .OrderByDescending(e => e.RecordDate)
+                .FirstOrDefault();
 
-            // 对每个产品，获取该周最后一天的净值，计算权益
-            foreach (var product in products)
+            // 如果该周没有记录，尝试使用该周之前最近的记录
+            if (weekEquity == null)
             {
-                // 获取该周最后一天的净值记录
-                var weekNetValue = await _context.ProductNetValues
-                    .Where(nv => nv.ProductId == product.Id && 
-                                 nv.NetValueDate >= weekStart && 
-                                 nv.NetValueDate <= weekEnd)
-                    .OrderByDescending(nv => nv.NetValueDate)
-                    .FirstOrDefaultAsync();
-
-                if (weekNetValue != null)
-                {
-                    // 使用该周的净值计算权益：净值 * 总份额
-                    weekTotalAmount += weekNetValue.NetValue * product.TotalShares;
-                }
-                else
-                {
-                    // 如果没有该周的净值记录，尝试获取该周之前最近的净值
-                    var previousNetValue = await _context.ProductNetValues
-                        .Where(nv => nv.ProductId == product.Id && nv.NetValueDate < weekStart)
-                        .OrderByDescending(nv => nv.NetValueDate)
-                        .FirstOrDefaultAsync();
-
-                    if (previousNetValue != null)
-                    {
-                        weekTotalAmount += previousNetValue.NetValue * product.TotalShares;
-                    }
-                    else
-                    {
-                        // 如果完全没有净值记录，使用产品当前总金额
-                        weekTotalAmount += product.TotalAmount;
-                    }
-                }
+                weekEquity = allEquityRecords
+                    .Where(e => e.RecordDate.Date < weekStart)
+                    .OrderByDescending(e => e.RecordDate)
+                    .FirstOrDefault();
             }
 
-            // 如果没有产品，使用当前总金额
-            if (weekTotalAmount == 0 && products.Count > 0)
+            // 如果仍然没有记录，使用当前权益（所有产品的当前净值 * 总份额）
+            decimal weekTotalAmount = 0;
+            if (weekEquity != null)
             {
-                // 使用 LINQ to Objects 的 Sum（在内存中计算）
-                weekTotalAmount = products.Select(p => p.TotalAmount).Sum();
+                weekTotalAmount = weekEquity.TotalAmount;
+            }
+            else
+            {
+                var products = await _context.Products.ToListAsync();
+                weekTotalAmount = products.Sum(p => p.CurrentNetValue * p.TotalShares);
             }
 
             weeks.Add(new
             {
                 Week = weekStart.ToString("yyyy-MM-dd"),
-                WeekLabel = $"第{10 - i}周",
+                WeekLabel = $"第{i + 1}周",
                 Amount = weekTotalAmount
             });
         }

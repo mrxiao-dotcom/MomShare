@@ -242,8 +242,22 @@ function drawWeeklyChart(data) {
     const maxAmount = Math.max(...amounts);
     const range = maxAmount - minAmount;
     
-    // 如果所有值相同，设置一个小的范围以便显示
-    const adjustedRange = range < 0.01 ? (maxAmount > 0 ? maxAmount * 0.1 : 1) : range;
+    // 计算坐标轴范围：最低值和最高值各扩展10%
+    let minAxis, maxAxis;
+    if (range < 0.01 || amounts.length === 1) {
+        // 如果所有值相同或只有一个数据，以该值为中心，上下10%
+        const centerValue = maxAmount > 0 ? maxAmount : (minAmount > 0 ? minAmount : 1);
+        minAxis = centerValue * 0.9;
+        maxAxis = centerValue * 1.1;
+    } else {
+        // 如果有多个不同值，最低值减10%，最高值加10%
+        minAxis = minAmount * 0.9;
+        maxAxis = maxAmount * 1.1;
+    }
+    
+    // 确保坐标轴范围不为0
+    const axisRange = maxAxis - minAxis;
+    const adjustedRange = axisRange > 0.01 ? axisRange : 1;
 
     // 绘制背景网格
     ctx.strokeStyle = '#e0e0e0';
@@ -274,7 +288,7 @@ function drawWeeklyChart(data) {
 
     amounts.forEach((amount, index) => {
         const x = leftPadding + index * stepX;
-        const y = height - bottomPadding - ((amount - minAmount) / adjustedRange) * chartHeight;
+        const y = height - bottomPadding - ((amount - minAxis) / adjustedRange) * chartHeight;
         
         if (index === 0) {
             ctx.moveTo(x, y);
@@ -288,7 +302,7 @@ function drawWeeklyChart(data) {
     ctx.fillStyle = '#4A90E2';
     amounts.forEach((amount, index) => {
         const x = leftPadding + index * stepX;
-        const y = height - bottomPadding - ((amount - minAmount) / adjustedRange) * chartHeight;
+        const y = height - bottomPadding - ((amount - minAxis) / adjustedRange) * chartHeight;
         
         ctx.beginPath();
         ctx.arc(x, y, 5, 0, Math.PI * 2);
@@ -311,32 +325,17 @@ function drawWeeklyChart(data) {
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
     
-    // 如果所有值都相同或接近，显示该值
-    if (range < 0.01 || adjustedRange < 0.01) {
-        const singleValue = maxAmount > 0 ? maxAmount : (minAmount > 0 ? minAmount : 0);
-        for (let i = 0; i <= 5; i++) {
-            const y = topPadding + (chartHeight / 5) * i;
-            // 简化显示，大数值用万为单位
-            const displayValue = singleValue >= 10000 
-                ? (singleValue / 10000).toFixed(1) + '万' 
-                : singleValue >= 1 
-                    ? singleValue.toFixed(0) 
-                    : singleValue.toFixed(2);
-            ctx.fillText(displayValue, leftPadding - 10, y);
-        }
-    } else {
-        // 正常情况：显示从最小值到最大值的5个刻度
-        for (let i = 0; i <= 5; i++) {
-            const value = minAmount + (range / 5) * (5 - i);
-            const y = topPadding + (chartHeight / 5) * i;
-            // 简化显示，大数值用万为单位
-            const displayValue = value >= 10000 
-                ? (value / 10000).toFixed(1) + '万' 
-                : value >= 1 
-                    ? value.toFixed(0) 
-                    : value.toFixed(2);
-            ctx.fillText(displayValue, leftPadding - 10, y);
-        }
+    // 显示从坐标轴最小值到最大值的5个刻度
+    for (let i = 0; i <= 5; i++) {
+        const value = minAxis + (axisRange / 5) * (5 - i);
+        const y = topPadding + (chartHeight / 5) * i;
+        // 简化显示，大数值用万为单位
+        const displayValue = value >= 10000 
+            ? (value / 10000).toFixed(1) + '万' 
+            : value >= 1 
+                ? value.toFixed(0) 
+                : value.toFixed(2);
+        ctx.fillText(displayValue, leftPadding - 10, y);
     }
 
     // 绘制标题
