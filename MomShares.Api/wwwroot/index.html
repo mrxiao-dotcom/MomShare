@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>份额管理系统</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="apple-touch-icon" href="/favicon.ico">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- 登录页面 -->
+    <div id="loginPage" class="page">
+        <div class="login-container">
+            <div class="login-box">
+                <h1>份额管理系统</h1>
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="username">用户名</label>
+                        <input type="text" id="username" name="username" required placeholder="请输入用户名">
+                    </div>
+                    <div class="form-group">
+                        <label for="password">密码</label>
+                        <input type="password" id="password" name="password" required placeholder="请输入密码">
+                    </div>
+                    <button type="submit" class="btn btn-primary">登录</button>
+                    <div id="loginError" class="error-message"></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主管理页面 -->
+    <div id="mainPage" class="page hidden">
+        <div class="header">
+            <h1>份额管理系统</h1>
+            <div class="user-info">
+                <span id="currentUser"></span>
+                <button id="logoutBtn" class="btn btn-secondary">退出登录</button>
+            </div>
+        </div>
+
+        <div class="container">
+            <nav class="sidebar">
+                <ul class="nav-menu">
+                    <li><a href="#" data-page="dashboard" class="nav-item active">综合仪表盘</a></li>
+                    <li><a href="#" data-page="products" class="nav-item">产品管理</a></li>
+                    <li><a href="#" data-page="holders" class="nav-item">持有者管理</a></li>
+                    <li><a href="#" data-page="shares" class="nav-item">份额管理</a></li>
+                    <li><a href="#" data-page="netvalues" class="nav-item">净值管理</a></li>
+                    <li><a href="#" data-page="dividends" class="nav-item">分红管理</a></li>
+                    <li><a href="#" data-page="capitalincreases" class="nav-item">增资管理</a></li>
+                    <li><a href="#" data-page="advisors" class="nav-item">投顾管理</a></li>
+                    <li><a href="#" data-page="managers" class="nav-item">管理方管理</a></li>
+                    <li><a href="#" data-page="system" class="nav-item">系统管理</a></li>
+                </ul>
+            </nav>
+
+            <main class="content">
+                <!-- 综合仪表盘 -->
+                <div id="dashboardPage" class="content-page active">
+                    <h2>综合仪表盘</h2>
+                    <div class="dashboard-container">
+                        <!-- 统计卡片 -->
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-icon">📊</div>
+                                <div class="stat-content">
+                                    <div class="stat-label">正在运行的产品数</div>
+                                    <div class="stat-value" id="activeProductsCount">-</div>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon">💰</div>
+                                <div class="stat-content">
+                                    <div class="stat-label">累计产品权益</div>
+                                    <div class="stat-value" id="totalProductAmount">-</div>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon">💵</div>
+                                <div class="stat-content">
+                                    <div class="stat-label">累计分红金额</div>
+                                    <div class="stat-value" id="totalDividendAmount">-</div>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon">📝</div>
+                                <div class="stat-content">
+                                    <div class="stat-label">分红笔数</div>
+                                    <div class="stat-value" id="dividendCount">-</div>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon">👥</div>
+                                <div class="stat-content">
+                                    <div class="stat-label">投资者人数</div>
+                                    <div class="stat-value" id="investorCount">-</div>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon">📈</div>
+                                <div class="stat-content">
+                                    <div class="stat-label">当日盈利</div>
+                                    <div class="stat-value" id="todayProfit">-</div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- 图表区域 -->
+                        <div class="chart-container">
+                            <div class="chart-card">
+                                <h3>最近10周总产品权益变化</h3>
+                                <div class="chart-wrapper">
+                                    <canvas id="weeklyAmountsChart" width="800" height="300"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 产品管理 -->
+                <div id="productsPage" class="content-page">
+                    <h2>产品管理</h2>
+                    <div class="toolbar">
+                        <button id="addProductBtn" class="btn btn-primary">新增产品</button>
+                    </div>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>产品名称</th>
+                                <th>产品代码</th>
+                                <th>初始权益</th>
+                                <th>当前总金额</th>
+                                <th>投顾</th>
+                                <th>管理方</th>
+                                <th>创建时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="productsTableBody">
+                            <tr><td colspan="9" class="loading">加载中...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 持有者管理 -->
+                <div id="holdersPage" class="content-page">
+                    <h2>持有者管理</h2>
+                    <div class="toolbar">
+                        <button id="addHolderBtn" class="btn btn-primary">新增持有者</button>
+                    </div>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>姓名</th>
+                                <th>手机号</th>
+                                <th>开户银行</th>
+                                <th>银行卡号</th>
+                                <th>户名</th>
+                                <th>创建时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="holdersTableBody">
+                            <tr><td colspan="8" class="loading">加载中...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 份额管理（以产品为基准分配份额） -->
+                <div id="sharesPage" class="content-page">
+                    <h2>份额管理</h2>
+                    <div class="toolbar">
+                        <button id="addShareBtn" class="btn btn-primary">刷新产品列表</button>
+                    </div>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>产品名称</th>
+                                <th>产品代码</th>
+                                <th>初始权益</th>
+                                <th>当前总权益</th>
+                                <th>持有人数</th>
+                                <th>是否已分配</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sharesTableBody">
+                            <tr><td colspan="8" class="loading">加载中...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 净值管理 -->
+                <div id="netvaluesPage" class="content-page">
+                    <h2>净值管理</h2>
+                    <div class="toolbar">
+                        <button id="addNetValueBtn" class="btn btn-primary">录入净值</button>
+                    </div>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>产品</th>
+                                <th>净值</th>
+                                <th>日期</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="netvaluesTableBody">
+                            <tr><td colspan="5" class="loading">加载中...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 分红管理 -->
+                <div id="dividendsPage" class="content-page">
+                    <h2>分红管理</h2>
+                    <div class="toolbar">
+                        <button id="addDividendBtn" class="btn btn-primary">刷新产品</button>
+                    </div>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>产品</th>
+                                <th>最新权益</th>
+                                <th>初始权益</th>
+                                <th>可分红金额</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dividendsTableBody">
+                            <tr><td colspan="6" class="loading">加载中...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 增资管理 -->
+                <div id="capitalincreasesPage" class="content-page">
+                    <h2>增减资管理</h2>
+                    <div class="toolbar">
+                        <button id="addCapitalIncreaseBtn" class="btn btn-primary">刷新产品</button>
+                    </div>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>产品</th>
+                                <th>初始权益</th>
+                                <th>当前权益</th>
+                                <th>当前净值</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="capitalincreasesTableBody">
+                            <tr><td colspan="5" class="loading">加载中...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 投顾管理 -->
+                <div id="advisorsPage" class="content-page">
+                    <h2>投顾管理</h2>
+                    <div class="toolbar">
+                        <button id="addAdvisorBtn" class="btn btn-primary">新增投顾</button>
+                    </div>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>名称</th>
+                                <th>联系人</th>
+                                <th>联系电话</th>
+                                <th>邮箱</th>
+                                <th>创建时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="advisorsTableBody">
+                            <tr><td colspan="7" class="loading">加载中...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 管理方管理 -->
+                <div id="managersPage" class="content-page">
+                    <h2>管理方管理</h2>
+                    <div class="toolbar">
+                        <button id="addManagerBtn" class="btn btn-primary">新增管理方</button>
+                    </div>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>名称</th>
+                                <th>联系人</th>
+                                <th>联系电话</th>
+                                <th>邮箱</th>
+                                <th>创建时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="managersTableBody">
+                            <tr><td colspan="7" class="loading">加载中...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 系统管理 -->
+                <div id="systemPage" class="content-page">
+                    <h2>系统管理</h2>
+                    <div class="toolbar">
+                        <button id="backupBtn" class="btn btn-primary">备份数据库</button>
+                    </div>
+                    <div class="system-section">
+                        <h3>管理员列表</h3>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>用户名</th>
+                                    <th>创建时间</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adminsTableBody">
+                                <tr><td colspan="4" class="loading">加载中...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- 模态框 -->
+    <div id="modal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <div id="modalBody"></div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
+

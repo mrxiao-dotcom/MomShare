@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>份额管理系统 - 客户中心</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="apple-touch-icon" href="/favicon.ico">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .holder-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .holder-header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        .holder-header h1 {
+            color: #4A90E2;
+            margin-bottom: 10px;
+        }
+        .holder-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .holder-card {
+            background: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        .holder-card h3 {
+            color: #4A90E2;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #4A90E2;
+            padding-bottom: 10px;
+        }
+        .share-item {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .share-item:last-child {
+            border-bottom: none;
+        }
+        .share-info {
+            flex: 1;
+        }
+        .share-info strong {
+            color: #333;
+            display: block;
+            margin-bottom: 5px;
+        }
+        .share-info span {
+            color: #666;
+            font-size: 14px;
+        }
+        .share-value {
+            text-align: right;
+        }
+        .share-value .amount {
+            font-size: 20px;
+            font-weight: 600;
+            color: #4A90E2;
+        }
+        .share-value .label {
+            font-size: 12px;
+            color: #999;
+        }
+        .dividend-item {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+        }
+        .dividend-item:last-child {
+            border-bottom: none;
+        }
+        .dividend-date {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+        .dividend-amount {
+            font-size: 18px;
+            font-weight: 600;
+            color: #27AE60;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+    <!-- 登录页面 -->
+    <div id="loginPage" class="page">
+        <div class="login-container">
+            <div class="login-box">
+                <h1>份额管理系统</h1>
+                <p style="text-align: center; color: #666; margin-bottom: 20px;">客户登录</p>
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="phone">手机号</label>
+                        <input type="text" id="phone" name="phone" required placeholder="请输入手机号">
+                    </div>
+                    <div class="form-group">
+                        <label for="password">密码</label>
+                        <input type="password" id="password" name="password" required placeholder="请输入密码">
+                    </div>
+                    <button type="submit" class="btn btn-primary">登录</button>
+                    <div id="loginError" class="error-message"></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主页面 -->
+    <div id="mainPage" class="page hidden">
+        <div class="holder-container">
+            <div class="holder-header">
+                <h1>份额管理系统 - 客户中心</h1>
+                <div class="holder-info">
+                    <div>
+                        <strong id="holderName">-</strong>
+                        <span id="holderPhone" style="color: #666; margin-left: 10px;">-</span>
+                    </div>
+                    <button id="logoutBtn" class="btn btn-secondary">退出登录</button>
+                </div>
+            </div>
+
+            <!-- 我的份额 -->
+            <div class="holder-card">
+                <h3>我的份额</h3>
+                <div id="sharesList">
+                    <div class="loading">加载中...</div>
+                </div>
+            </div>
+
+            <!-- 我的分红记录 -->
+            <div class="holder-card">
+                <h3>我的分红记录</h3>
+                <div id="dividendsList">
+                    <div class="loading">加载中...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API 基础配置
+        const API_BASE_URL = window.location.origin;
+        let authToken = localStorage.getItem('holderToken') || null;
+        let currentHolder = JSON.parse(localStorage.getItem('currentHolder') || '{}');
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            if (authToken && currentHolder.name) {
+                showMainPage();
+                loadHolderData();
+            } else {
+                showLoginPage();
+            }
+            setupEventListeners();
+        });
+
+        // 设置事件监听
+        function setupEventListeners() {
+            document.getElementById('loginForm')?.addEventListener('submit', handleLogin);
+            document.getElementById('logoutBtn')?.addEventListener('click', handleLogout);
+        }
+
+        // 显示登录页面
+        function showLoginPage() {
+            document.getElementById('loginPage').classList.remove('hidden');
+            document.getElementById('mainPage').classList.add('hidden');
+        }
+
+        // 显示主页面
+        function showMainPage() {
+            document.getElementById('loginPage').classList.add('hidden');
+            document.getElementById('mainPage').classList.remove('hidden');
+            document.getElementById('holderName').textContent = currentHolder.name || '-';
+            document.getElementById('holderPhone').textContent = currentHolder.phone || '-';
+        }
+
+        // API 调用函数
+        async function apiCall(endpoint, options = {}) {
+            const url = `${API_BASE_URL}${endpoint}`;
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            
+            if (authToken) {
+                headers['Authorization'] = `Bearer ${authToken}`;
+            }
+            
+            const config = {
+                method: options.method || 'GET',
+                headers: headers
+            };
+            
+            if (options.body && typeof options.body === 'object') {
+                config.body = JSON.stringify(options.body);
+            }
+            
+            try {
+                const response = await fetch(url, config);
+                
+                if (response.status === 401) {
+                    handleLogout();
+                    throw new Error('未授权，请重新登录');
+                }
+                
+                if (!response.ok) {
+                    let errorMessage = '请求失败';
+                    try {
+                        const errorData = await response.json();
+                        errorMessage = errorData.message || errorMessage;
+                    } catch (e) {
+                        errorMessage = `请求失败: ${response.status} ${response.statusText}`;
+                    }
+                    throw new Error(errorMessage);
+                }
+                
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    return await response.json();
+                } else {
+                    return await response.text();
+                }
+            } catch (error) {
+                console.error('API调用错误:', error);
+                throw error;
+            }
+        }
+
+        // 登录处理
+        async function handleLogin(e) {
+            e.preventDefault();
+            const phone = document.getElementById('phone').value;
+            const password = document.getElementById('password').value;
+            const errorDiv = document.getElementById('loginError');
+            
+            errorDiv.textContent = '';
+            
+            try {
+                const response = await apiCall('/api/auth/holder/login', {
+                    method: 'POST',
+                    body: { username: phone, password }
+                });
+                
+                authToken = response.Token || response.token;
+                currentHolder = {
+                    name: response.Username || response.username,
+                    phone: phone,
+                    userId: response.UserId || response.userId
+                };
+                
+                if (!authToken) {
+                    throw new Error('登录响应中未找到 Token');
+                }
+                
+                localStorage.setItem('holderToken', authToken);
+                localStorage.setItem('currentHolder', JSON.stringify(currentHolder));
+                
+                showMainPage();
+                loadHolderData();
+            } catch (error) {
+                errorDiv.textContent = error.message || '登录失败，请检查手机号和密码';
+            }
+        }
+
+        // 退出登录
+        function handleLogout() {
+            authToken = null;
+            currentHolder = {};
+            localStorage.removeItem('holderToken');
+            localStorage.removeItem('currentHolder');
+            showLoginPage();
+        }
+
+        // 加载持有者数据
+        async function loadHolderData() {
+            try {
+                await Promise.all([
+                    loadShares(),
+                    loadDividends()
+                ]);
+            } catch (error) {
+                console.error('加载数据失败:', error);
+                alert('加载数据失败: ' + error.message);
+            }
+        }
+
+        // 加载份额列表
+        async function loadShares() {
+            const sharesList = document.getElementById('sharesList');
+            sharesList.innerHTML = '<div class="loading">加载中...</div>';
+            
+            try {
+                const shares = await apiCall('/api/holder/shares');
+                
+                if (!Array.isArray(shares) || shares.length === 0) {
+                    sharesList.innerHTML = '<div class="empty-state">暂无份额记录</div>';
+                    return;
+                }
+                
+                sharesList.innerHTML = shares.map(share => {
+                    const productName = share.productName || share.ProductName || '-';
+                    const productCode = share.productCode || share.ProductCode || '';
+                    const shareAmount = share.shareAmount || share.ShareAmount || 0;
+                    const investmentAmount = share.investmentAmount || share.InvestmentAmount || 0;
+                    const currentNetValue = share.currentNetValue || share.CurrentNetValue || 1;
+                    const currentValue = share.currentValue || share.CurrentValue || (shareAmount * currentNetValue);
+                    const shareRatio = (share.shareRatio || share.ShareRatio || 0) * 100;
+                    
+                    // 计算数据
+                    const balance = share.balance || share.Balance || (currentValue - investmentAmount);
+                    const expectedDividend = share.expectedDividend || share.ExpectedDividend || 0;
+                    const residualValue = share.residualValue || share.ResidualValue || investmentAmount;
+                    const returnRate = share.returnRate || share.ReturnRate || 0;
+                    const shareType = share.shareType || share.ShareType || 'Subordinate';
+                    
+                    // 判断是否盈利
+                    const isProfit = balance > 0;
+                    const balanceColor = isProfit ? '#27AE60' : '#E74C3C';
+                    const returnRateColor = returnRate >= 0 ? '#27AE60' : '#E74C3C';
+                    
+                    return `
+                        <div class="share-item">
+                            <div class="share-info">
+                                <strong>${productName}${productCode ? ' (' + productCode + ')' : ''}</strong>
+                                <span>持有份额: ${shareAmount.toFixed(2)} | 占比: ${shareRatio.toFixed(2)}% | ${shareType === 'Priority' ? '优先方' : '劣后方'}</span>
+                                <div style="margin-top: 10px; font-size: 14px;">
+                                    <div>初始投资: ¥${investmentAmount.toFixed(2)}</div>
+                                    <div>当前市值: ¥${currentValue.toFixed(2)} (净值: ${currentNetValue.toFixed(4)})</div>
+                                    <div style="color: ${balanceColor}; margin-top: 5px;">
+                                        结余: ${isProfit ? '+' : ''}¥${balance.toFixed(2)}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="share-value">
+                                <div style="margin-bottom: 15px;">
+                                    <div class="amount" style="color: ${returnRateColor};">预期分红: ¥${expectedDividend.toFixed(2)}</div>
+                                    <div class="label">权益残值: ¥${residualValue.toFixed(2)}</div>
+                                </div>
+                                <div style="border-top: 1px solid #eee; padding-top: 10px;">
+                                    <div class="amount" style="color: ${returnRateColor}; font-size: 18px;">
+                                        投资回报率: ${returnRate >= 0 ? '+' : ''}${returnRate.toFixed(2)}%
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (error) {
+                sharesList.innerHTML = `<div class="empty-state">加载失败: ${error.message}</div>`;
+            }
+        }
+
+        // 加载分红记录
+        async function loadDividends() {
+            const dividendsList = document.getElementById('dividendsList');
+            dividendsList.innerHTML = '<div class="loading">加载中...</div>';
+            
+            try {
+                const dividends = await apiCall('/api/holder/dividends');
+                
+                if (!Array.isArray(dividends) || dividends.length === 0) {
+                    dividendsList.innerHTML = '<div class="empty-state">暂无分红记录</div>';
+                    return;
+                }
+                
+                dividendsList.innerHTML = dividends.map(dividend => {
+                    const productName = dividend.productName || dividend.ProductName || '-';
+                    const dividendDate = dividend.dividendDate || dividend.DividendDate;
+                    const amount = dividend.amount || dividend.Amount || 0;
+                    const dateStr = new Date(dividendDate).toLocaleDateString('zh-CN');
+                    
+                    return `
+                        <div class="dividend-item">
+                            <div class="dividend-date">${dateStr} - ${productName}</div>
+                            <div class="dividend-amount">+¥${amount.toFixed(2)}</div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (error) {
+                dividendsList.innerHTML = `<div class="empty-state">加载失败: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>
+
