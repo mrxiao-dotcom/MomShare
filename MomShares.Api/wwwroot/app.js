@@ -402,12 +402,34 @@ async function apiCall(endpoint, options = {}) {
         }
         
         // 解析响应数据
-        const contentType = response.headers.get('content-type');
-        if (contentType && contentType.includes('application/json')) {
-            const data = await response.json();
-            return data;
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+            const text = await response.text();
+            try {
+                const data = JSON.parse(text);
+                // 确保返回的是数组或对象，而不是字符串
+                if (typeof data === 'string') {
+                    console.error('API返回了字符串而不是JSON对象:', endpoint, data.substring(0, 100));
+                    throw new Error('API返回格式错误');
+                }
+                return data;
+            } catch (parseError) {
+                console.error('JSON解析失败:', endpoint, text.substring(0, 200));
+                throw new Error('JSON解析失败: ' + parseError.message);
+            }
+        } else if (contentType.includes('text/html')) {
+            // 如果返回的是HTML（可能是404回退到了index.html），抛出错误
+            const text = await response.text();
+            if (text.includes('<!DOCTYPE html>')) {
+                console.error('API返回了HTML页面，可能是路由未匹配或认证失败:', endpoint);
+                console.error('响应内容前200字符:', text.substring(0, 200));
+                throw new Error(`API路由未找到或认证失败: ${endpoint}`);
+            }
+            throw new Error(`意外的响应类型: ${contentType}`);
         } else {
-            return await response.text();
+            const text = await response.text();
+            console.warn('非JSON响应:', endpoint, contentType, text.substring(0, 100));
+            return text;
         }
     } catch (error) {
         console.error('API调用错误:', error);
@@ -471,6 +493,12 @@ async function loadProducts() {
     
     try {
         const products = await apiCall('/api/products');
+        // 确保 products 是数组
+        if (!Array.isArray(products)) {
+            console.error('产品数据格式错误，期望数组，实际收到:', typeof products, products);
+            tbody.innerHTML = '<tr><td colspan="5" class="loading">数据格式错误</td></tr>';
+            return;
+        }
         if (products.length === 0) {
             tbody.innerHTML = '<tr><td colspan="5" class="loading">暂无数据</td></tr>';
             return;
@@ -517,6 +545,12 @@ async function loadHolders() {
     
     try {
         const holders = await apiCall('/api/holders');
+        // 确保 holders 是数组
+        if (!Array.isArray(holders)) {
+            console.error('持有者数据格式错误，期望数组，实际收到:', typeof holders, holders);
+            tbody.innerHTML = '<tr><td colspan="8" class="loading">数据格式错误</td></tr>';
+            return;
+        }
         if (holders.length === 0) {
             tbody.innerHTML = '<tr><td colspan="8" class="loading">暂无数据</td></tr>';
             return;

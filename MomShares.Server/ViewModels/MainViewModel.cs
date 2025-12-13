@@ -6,6 +6,8 @@ using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System.Text.Json;
+using Microsoft.AspNetCore.Builder;
+using MomShares.Api;
 
 namespace MomShares.Server.ViewModels;
 
@@ -14,7 +16,8 @@ namespace MomShares.Server.ViewModels;
 /// </summary>
 public partial class MainViewModel : ObservableObject
 {
-    private Process? _apiProcess;
+    private WebApplication? _webApp;
+    private Task? _webAppTask;
     private string _configFilePath = "appsettings.json";
     private AppConfig? _config;
 
@@ -71,70 +74,116 @@ public partial class MainViewModel : ObservableObject
     {
         try
         {
-            if (_apiProcess != null && !_apiProcess.HasExited)
+            if (_webApp != null)
             {
                 AddLog("服务已在运行中");
                 return;
             }
 
-            // 查找API项目路径
-            var currentDir = Directory.GetCurrentDirectory();
-            var apiPath = Path.Combine(currentDir, "..", "..", "..", "..", "MomShares.Api", "bin", "Debug", "net8.0", "MomShares.Api.exe");
-            apiPath = Path.GetFullPath(apiPath);
+            AddLog("正在启动Web服务器...");
             
-            if (!File.Exists(apiPath))
+            // 查找API项目目录和数据库文件
+            var currentDir = Directory.GetCurrentDirectory();
+            var apiDir = Path.Combine(currentDir, "..", "..", "..", "..", "MomShares.Api");
+            apiDir = Path.GetFullPath(apiDir);
+            
+            // 查找原有的数据库文件（可能在项目目录下）
+            var projectDbPath = Path.Combine(apiDir, "MomShares.db");
+            var localAppDataDbPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "MomShares", "MomShares.db");
+            
+            // 如果项目目录下有数据库，优先使用
+            if (File.Exists(projectDbPath))
             {
-                // 尝试其他路径
-                apiPath = Path.Combine(currentDir, "MomShares.Api.exe");
-                if (!File.Exists(apiPath))
+                AddLog($"找到项目数据库: {projectDbPath}");
+                // 设置环境变量，让WebAppBuilder使用这个数据库
+                Environment.SetEnvironmentVariable("MomShares_DbPath", projectDbPath);
+            }
+            else if (File.Exists(localAppDataDbPath))
+            {
+                AddLog($"找到本地数据库: {localAppDataDbPath}");
+            }
+            else
+            {
+                AddLog($"未找到数据库文件，将创建新数据库");
+            }
+            
+            if (Directory.Exists(apiDir))
+            {
+                var originalDir = Directory.GetCurrentDirectory();
+                Directory.SetCurrentDirectory(apiDir);
+                AddLog($"设置工作目录为: {apiDir}");
+                
+                try
                 {
-                    AddLog($"错误：找不到API程序文件");
-                    MessageBox.Show($"找不到API程序文件\n请先编译MomShares.Api项目", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-                    return;
+                    // 创建Web应用
+                    var urls = $"http://localhost:{ApiPort}";
+                    _webApp = WebAppBuilder.CreateWebApplication(null, urls);
+                }
+                finally
+                {
+                    // 恢复原始工作目录
+                    Directory.SetCurrentDirectory(originalDir);
                 }
             }
-
-            var startInfo = new ProcessStartInfo
+            else
             {
-                FileName = apiPath,
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true,
-                Arguments = $"--urls http://localhost:{ApiPort}"
-            };
-
-            _apiProcess = Process.Start(startInfo);
-            if (_apiProcess != null)
-            {
-                _apiProcess.OutputDataReceived += (sender, e) =>
-                {
-                    if (!string.IsNullOrEmpty(e.Data))
-                    {
-                        Application.Current.Dispatcher.Invoke(() => AddLog(e.Data));
-                    }
-                };
-                _apiProcess.ErrorDataReceived += (sender, e) =>
-                {
-                    if (!string.IsNullOrEmpty(e.Data))
-                    {
-                        Application.Current.Dispatcher.Invoke(() => AddLog($"错误：{e.Data}"));
-                    }
-                };
-
-                _apiProcess.BeginOutputReadLine();
-                _apiProcess.BeginErrorReadLine();
-
-                IsServiceRunning = true;
-                ServiceStatus = "运行中";
-                AddLog($"服务已启动，端口：{ApiPort}");
-                AddLog($"API地址：http://localhost:{ApiPort}");
+                // 如果找不到API目录，使用当前目录
+                AddLog($"未找到API项目目录，使用当前目录: {currentDir}");
+                var urls = $"http://localhost:{ApiPort}";
+                _webApp = WebAppBuilder.CreateWebApplication(null, urls);
             }
+
+            // 初始化数据库
+            AddLog("正在初始化数据库...");
+            await WebAppBuilder.InitializeDatabaseAsync(_webApp);
+            AddLog("数据库初始化完成");
+
+            // 在后台任务中运行Web应用
+            _webAppTask = Task.Run(async () =>
+            {
+                try
+                {
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        IsServiceRunning = true;
+                        ServiceStatus = "运行中";
+                        AddLog("========================================");
+                        AddLog("  份额管理系统 - Web服务器已启动");
+                        AddLog("========================================");
+                        AddLog($"  管理界面: http://localhost:{ApiPort}");
+                        AddLog($"  API文档: http://localhost:{ApiPort}/swagger");
+                        AddLog("========================================");
+                    });
+
+                    await _webApp.RunAsync();
+                }
+                catch (Exception ex)
+                {
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        AddLog($"服务运行错误：{ex.Message}");
+                        IsServiceRunning = false;
+                        ServiceStatus = "已停止";
+                        _webApp = null;
+                        _webAppTask = null;
+                    });
+                }
+            });
+
+            // 等待一小段时间确保服务启动
+            await Task.Delay(500);
         }
         catch (Exception ex)
         {
             AddLog($"启动服务失败：{ex.Message}");
+            AddLog($"错误详情：{ex.StackTrace}");
             MessageBox.Show($"启动服务失败：{ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            IsServiceRunning = false;
+            ServiceStatus = "已停止";
+            _webApp = null;
+            _webAppTask = null;
         }
     }
 
@@ -142,16 +191,29 @@ public partial class MainViewModel : ObservableObject
     /// 停止服务
     /// </summary>
     [RelayCommand]
-    private void StopService()
+    public async Task StopServiceAsync()
     {
         try
         {
-            if (_apiProcess != null && !_apiProcess.HasExited)
+            if (_webApp != null)
             {
-                _apiProcess.Kill();
-                _apiProcess.WaitForExit(5000);
-                _apiProcess.Dispose();
-                _apiProcess = null;
+                AddLog("正在停止服务...");
+                
+                // 停止Web应用
+                await _webApp.StopAsync();
+                await _webApp.DisposeAsync();
+                _webApp = null;
+
+                // 等待任务完成
+                if (_webAppTask != null)
+                {
+                    try
+                    {
+                        await Task.WhenAny(_webAppTask, Task.Delay(5000));
+                    }
+                    catch { }
+                    _webAppTask = null;
+                }
 
                 IsServiceRunning = false;
                 ServiceStatus = "已停止";
@@ -166,6 +228,8 @@ public partial class MainViewModel : ObservableObject
         {
             AddLog($"停止服务失败：{ex.Message}");
             MessageBox.Show($"停止服务失败：{ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            IsServiceRunning = false;
+            ServiceStatus = "已停止";
         }
     }
 

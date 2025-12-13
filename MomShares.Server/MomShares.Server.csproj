@@ -2,6 +2,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MomShares.Core\MomShares.Core.csproj" />
+    <ProjectReference Include="..\MomShares.Infrastructure\MomShares.Infrastructure.csproj" />
+    <ProjectReference Include="..\MomShares.Api\MomShares.Api.csproj" />
   </ItemGroup>
 
   <ItemGroup>
