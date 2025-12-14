@@ -102,6 +102,63 @@
             padding: 40px;
             color: #999;
         }
+        .chart-modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        .chart-modal-content {
+            background-color: #fff;
+            margin: 5% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 900px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+        .chart-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #4A90E2;
+        }
+        .chart-modal-header h2 {
+            color: #4A90E2;
+            margin: 0;
+        }
+        .chart-close {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            line-height: 20px;
+        }
+        .chart-close:hover {
+            color: #000;
+        }
+        .chart-container {
+            width: 100%;
+            height: 400px;
+            margin: 20px 0;
+        }
+        .chart-wrapper {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+        #netValueChart {
+            width: 100%;
+            height: 100%;
+        }
     </style>
 </head>
 <body>
@@ -154,6 +211,21 @@
                 <h3>我的分红记录</h3>
                 <div id="dividendsList">
                     <div class="loading">加载中...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 净值走势图模态窗口 -->
+    <div id="chartModal" class="chart-modal">
+        <div class="chart-modal-content">
+            <div class="chart-modal-header">
+                <h2 id="chartModalTitle">净值走势图</h2>
+                <span class="chart-close" onclick="closeChartModal()">&times;</span>
+            </div>
+            <div class="chart-container">
+                <div class="chart-wrapper">
+                    <canvas id="netValueChart"></canvas>
                 </div>
             </div>
         </div>
@@ -339,6 +411,7 @@
                     const balanceColor = isProfit ? '#27AE60' : '#E74C3C';
                     const returnRateColor = returnRate >= 0 ? '#27AE60' : '#E74C3C';
                     
+                    const productId = share.productId || share.ProductId || 0;
                     return `
                         <div class="share-item">
                             <div class="share-info">
@@ -361,6 +434,10 @@
                                     <div class="amount" style="color: ${returnRateColor}; font-size: 18px;">
                                         投资回报率: ${returnRate >= 0 ? '+' : ''}${returnRate.toFixed(2)}%
                                     </div>
+                                    <button class="btn btn-secondary" style="margin-top: 10px; width: 100%; font-size: 12px; padding: 5px;" 
+                                            onclick="showNetValueChart(${productId}, '${productName}')">
+                                        查看历史净值走势图
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -368,6 +445,182 @@
                 }).join('');
             } catch (error) {
                 sharesList.innerHTML = `<div class="empty-state">加载失败: ${error.message}</div>`;
+            }
+        }
+
+        // 显示净值走势图
+        async function showNetValueChart(productId, productName) {
+            const modal = document.getElementById('chartModal');
+            const title = document.getElementById('chartModalTitle');
+            const canvas = document.getElementById('netValueChart');
+            
+            title.textContent = `${productName} - 历史净值走势图`;
+            modal.style.display = 'block';
+            
+            try {
+                // 获取净值历史数据
+                const data = await apiCall(`/api/holder/products/${productId}/netvalues`);
+                
+                if (!Array.isArray(data) || data.length === 0) {
+                    alert('暂无净值历史数据');
+                    closeChartModal();
+                    return;
+                }
+                
+                // 绘制图表
+                drawNetValueChart(canvas, data, productName);
+            } catch (error) {
+                console.error('加载净值数据失败:', error);
+                alert('加载净值数据失败: ' + error.message);
+                closeChartModal();
+            }
+        }
+        
+        // 关闭图表模态窗口
+        function closeChartModal() {
+            document.getElementById('chartModal').style.display = 'none';
+        }
+        
+        // 绘制净值走势图
+        function drawNetValueChart(canvas, data, productName) {
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width = canvas.offsetWidth;
+            const height = canvas.height = 400;
+            
+            // 清空画布
+            ctx.clearRect(0, 0, width, height);
+            
+            if (data.length === 0) {
+                ctx.fillStyle = '#666';
+                ctx.font = '16px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('暂无数据', width / 2, height / 2);
+                return;
+            }
+            
+            // 计算数据范围
+            const values = data.map(d => parseFloat(d.value || d.Value || 0));
+            const minValue = Math.min(...values);
+            const maxValue = Math.max(...values);
+            const range = maxValue - minValue;
+            
+            // 计算坐标轴范围（上下各扩展10%）
+            let minAxis, maxAxis;
+            if (range < 0.01 || values.length === 1) {
+                const centerValue = maxValue > 0 ? maxValue : (minValue > 0 ? minValue : 1);
+                minAxis = centerValue * 0.9;
+                maxAxis = centerValue * 1.1;
+            } else {
+                minAxis = minValue * 0.9;
+                maxAxis = maxValue * 1.1;
+            }
+            const axisRange = maxAxis - minAxis;
+            
+            // 设置边距
+            const leftPadding = 60;
+            const rightPadding = 20;
+            const topPadding = 20;
+            const bottomPadding = 40;
+            const chartWidth = width - leftPadding - rightPadding;
+            const chartHeight = height - topPadding - bottomPadding;
+            
+            // 绘制背景
+            ctx.fillStyle = '#f9f9f9';
+            ctx.fillRect(leftPadding, topPadding, chartWidth, chartHeight);
+            
+            // 绘制网格线
+            ctx.strokeStyle = '#e0e0e0';
+            ctx.lineWidth = 1;
+            
+            // 水平网格线（Y轴）
+            for (let i = 0; i <= 5; i++) {
+                const y = topPadding + (chartHeight / 5) * i;
+                ctx.beginPath();
+                ctx.moveTo(leftPadding, y);
+                ctx.lineTo(leftPadding + chartWidth, y);
+                ctx.stroke();
+            }
+            
+            // 垂直网格线（X轴）
+            const xStep = chartWidth / (data.length - 1 || 1);
+            for (let i = 0; i < data.length; i++) {
+                const x = leftPadding + xStep * i;
+                ctx.beginPath();
+                ctx.moveTo(x, topPadding);
+                ctx.lineTo(x, topPadding + chartHeight);
+                ctx.stroke();
+            }
+            
+            // 绘制Y轴标签
+            ctx.fillStyle = '#666';
+            ctx.font = '11px Arial';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            
+            for (let i = 0; i <= 5; i++) {
+                const value = minAxis + (axisRange / 5) * (5 - i);
+                const y = topPadding + (chartHeight / 5) * i;
+                ctx.fillText(value.toFixed(4), leftPadding - 10, y);
+            }
+            
+            // 绘制X轴标签（日期）
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            const dateStep = Math.max(1, Math.floor(data.length / 10)); // 最多显示10个日期标签
+            
+            for (let i = 0; i < data.length; i += dateStep) {
+                const x = leftPadding + xStep * i;
+                const dateStr = data[i].date || data[i].Date || '';
+                if (dateStr) {
+                    // 只显示月-日
+                    const date = new Date(dateStr);
+                    const label = `${date.getMonth() + 1}-${date.getDate()}`;
+                    ctx.fillText(label, x, topPadding + chartHeight + 5);
+                }
+            }
+            
+            // 绘制折线
+            ctx.strokeStyle = '#4A90E2';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            
+            for (let i = 0; i < data.length; i++) {
+                const value = parseFloat(data[i].value || data[i].Value || 0);
+                const x = leftPadding + xStep * i;
+                const y = topPadding + chartHeight - ((value - minAxis) / axisRange) * chartHeight;
+                
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            }
+            ctx.stroke();
+            
+            // 绘制数据点
+            ctx.fillStyle = '#4A90E2';
+            for (let i = 0; i < data.length; i++) {
+                const value = parseFloat(data[i].value || data[i].Value || 0);
+                const x = leftPadding + xStep * i;
+                const y = topPadding + chartHeight - ((value - minAxis) / axisRange) * chartHeight;
+                
+                ctx.beginPath();
+                ctx.arc(x, y, 3, 0, 2 * Math.PI);
+                ctx.fill();
+            }
+            
+            // 绘制标题
+            ctx.fillStyle = '#333';
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(`${productName} - 净值走势`, width / 2, 10);
+        }
+        
+        // 点击模态窗口外部关闭
+        window.onclick = function(event) {
+            const modal = document.getElementById('chartModal');
+            if (event.target === modal) {
+                closeChartModal();
             }
         }
 

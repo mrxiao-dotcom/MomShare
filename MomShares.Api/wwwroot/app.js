@@ -389,6 +389,11 @@ async function apiCall(endpoint, options = {}) {
             throw new Error('未授权，请重新登录');
         }
         
+        // 处理 204 No Content 响应（通常用于 PUT/DELETE 成功操作）
+        if (response.status === 204) {
+            return null; // 返回 null 表示成功但无内容
+        }
+        
         // 处理 404 等错误
         if (!response.ok) {
             let errorMessage = '请求失败';
@@ -405,6 +410,10 @@ async function apiCall(endpoint, options = {}) {
         const contentType = response.headers.get('content-type') || '';
         if (contentType.includes('application/json')) {
             const text = await response.text();
+            // 如果响应体为空，返回 null
+            if (!text || text.trim().length === 0) {
+                return null;
+            }
             try {
                 const data = JSON.parse(text);
                 // 确保返回的是数组或对象，而不是字符串
@@ -427,7 +436,11 @@ async function apiCall(endpoint, options = {}) {
             }
             throw new Error(`意外的响应类型: ${contentType}`);
         } else {
+            // 对于其他类型（如空响应），返回 null
             const text = await response.text();
+            if (!text || text.trim().length === 0) {
+                return null;
+            }
             console.warn('非JSON响应:', endpoint, contentType, text.substring(0, 100));
             return text;
         }
@@ -1666,13 +1679,17 @@ function showChangePasswordModal(holderId) {
         };
         
         try {
-            await apiCall(`/api/holders/${holderId}/password`, {
+            const result = await apiCall(`/api/holders/${holderId}/password`, {
                 method: 'PUT',
                 body: data
             });
+            // 204 NoContent 或 null 都表示成功
             closeModal();
             alert('密码修改成功');
+            // 刷新持有人列表
+            loadHolders();
         } catch (error) {
+            console.error('修改密码失败:', error);
             alert('修改失败: ' + error.message);
         }
     });

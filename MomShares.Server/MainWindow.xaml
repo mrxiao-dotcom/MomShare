@@ -6,8 +6,9 @@
         xmlns:local="clr-namespace:MomShares.Server"
         xmlns:vm="clr-namespace:MomShares.Server.ViewModels"
         mc:Ignorable="d"
-        Title="MomShares 服务器控制端" Height="600" Width="900"
-        WindowStartupLocation="CenterScreen">
+        Title="份额管理系统 - 服务器控制端" Height="600" Width="900"
+        WindowStartupLocation="CenterScreen"
+        Icon="app.ico">
     <Window.DataContext>
         <vm:MainViewModel />
     </Window.DataContext>

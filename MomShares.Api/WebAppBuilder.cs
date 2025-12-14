@@ -117,6 +117,14 @@ public static class WebAppBuilder
         if (!string.IsNullOrEmpty(urls))
         {
             builder.WebHost.UseUrls(urls);
+            Console.WriteLine($"[WebAppBuilder] 设置监听地址: {urls}");
+        }
+        else
+        {
+            // 如果没有指定URL，默认监听所有网络接口
+            var defaultUrl = "http://0.0.0.0:5000";
+            builder.WebHost.UseUrls(defaultUrl);
+            Console.WriteLine($"[WebAppBuilder] 使用默认监听地址: {defaultUrl}");
         }
 
         // 设置内容根目录和Web根目录，确保能找到wwwroot
@@ -150,11 +158,36 @@ public static class WebAppBuilder
                     var exeDir = Path.GetDirectoryName(exePath);
                     if (!string.IsNullOrEmpty(exeDir))
                     {
+                        // 尝试执行文件所在目录
                         var testPath = Path.Combine(exeDir, "wwwroot");
                         if (Directory.Exists(testPath))
                         {
                             wwwrootPath = testPath;
                             contentRoot = exeDir;
+                        }
+                        else
+                        {
+                            // 尝试执行文件所在目录的父目录（可能是发布目录结构）
+                            var parentDir = Path.GetDirectoryName(exeDir);
+                            if (!string.IsNullOrEmpty(parentDir))
+                            {
+                                testPath = Path.Combine(parentDir, "wwwroot");
+                                if (Directory.Exists(testPath))
+                                {
+                                    wwwrootPath = testPath;
+                                    contentRoot = parentDir;
+                                }
+                                else
+                                {
+                                    // 尝试在父目录下查找 MomShares.Api/wwwroot
+                                    testPath = Path.Combine(parentDir, "MomShares.Api", "wwwroot");
+                                    if (Directory.Exists(testPath))
+                                    {
+                                        wwwrootPath = testPath;
+                                        contentRoot = Path.Combine(parentDir, "MomShares.Api");
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -223,7 +256,22 @@ public static class WebAppBuilder
                 ValidateAudience = true,
                 ValidAudience = audience,
                 ValidateLifetime = true,
-                ClockSkew = TimeSpan.Zero
+                ClockSkew = TimeSpan.FromMinutes(5) // 允许5分钟的时钟偏差，避免服务器时间不同步问题
+            };
+            
+            // 添加事件处理，记录认证错误
+            options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
+            {
+                OnAuthenticationFailed = context =>
+                {
+                    Console.WriteLine($"[JWT认证失败] {context.Exception.Message}");
+                    return Task.CompletedTask;
+                },
+                OnChallenge = context =>
+                {
+                    Console.WriteLine($"[JWT挑战] {context.Error} - {context.ErrorDescription}");
+                    return Task.CompletedTask;
+                }
             };
         });
 
@@ -247,14 +295,15 @@ public static class WebAppBuilder
         Console.WriteLine($"[WebAppBuilder] 控制器程序集: {controllersAssembly.FullName}");
         Console.WriteLine($"[WebAppBuilder] 控制器程序集位置: {controllersAssembly.Location}");
 
-        // 添加CORS
+        // 添加CORS（允许所有来源，用于服务器部署）
         builder.Services.AddCors(options =>
         {
             options.AddPolicy("AllowAll", policy =>
             {
                 policy.AllowAnyOrigin()
                       .AllowAnyMethod()
-                      .AllowAnyHeader();
+                      .AllowAnyHeader()
+                      .WithExposedHeaders("*"); // 暴露所有响应头
             });
         });
 
@@ -269,6 +318,8 @@ public static class WebAppBuilder
         // 静态文件中间件只处理存在的文件，如果文件不存在，请求会继续到下一个中间件
         if (Directory.Exists(wwwrootPath))
         {
+            Console.WriteLine($"[静态文件] 配置静态文件服务，路径: {wwwrootPath}");
+            
             // 配置默认文件（index.html）- 必须在 UseStaticFiles 之前
             var defaultFileOptions = new DefaultFilesOptions
             {
@@ -282,9 +333,24 @@ public static class WebAppBuilder
             var staticFileOptions = new StaticFileOptions
             {
                 FileProvider = new PhysicalFileProvider(wwwrootPath),
-                RequestPath = ""
+                RequestPath = "",
+                OnPrepareResponse = context =>
+                {
+                    // 记录静态文件请求（用于调试）
+                    var path = context.Context.Request.Path.Value ?? "";
+                    if (path.EndsWith(".css") || path.EndsWith(".js") || path.EndsWith(".ico"))
+                    {
+                        Console.WriteLine($"[静态文件] 提供文件: {path}");
+                    }
+                }
             };
             app.UseStaticFiles(staticFileOptions);
+            
+            // 验证关键文件是否存在
+            var cssPath = Path.Combine(wwwrootPath, "styles.css");
+            var jsPath = Path.Combine(wwwrootPath, "app.js");
+            Console.WriteLine($"[静态文件] styles.css 存在: {File.Exists(cssPath)}");
+            Console.WriteLine($"[静态文件] app.js 存在: {File.Exists(jsPath)}");
         }
         else
         {
@@ -337,28 +403,50 @@ public static class WebAppBuilder
         // 如果 API 路径没有被匹配（比如认证失败），应该返回 404 而不是 index.html
         app.MapFallback(async context =>
         {
+            // 记录请求路径（用于调试）
+            var requestPath = context.Request.Path.Value ?? "/";
+            Console.WriteLine($"[MapFallback] 处理请求: {context.Request.Method} {requestPath}");
+            
             // 如果是 API 或 Swagger 路径，返回 404（不应该到达这里，但以防万一）
             if (context.Request.Path.StartsWithSegments("/api") || 
                 context.Request.Path.StartsWithSegments("/swagger"))
             {
+                Console.WriteLine($"[MapFallback] API/Swagger 路径，返回 404");
                 context.Response.StatusCode = 404;
                 await context.Response.WriteAsync("API endpoint not found");
                 return;
             }
             
             // 否则，如果wwwroot存在，读取并返回index.html
+            Console.WriteLine($"[MapFallback] 检查 wwwroot: {wwwrootPath}");
+            Console.WriteLine($"[MapFallback] wwwroot 存在: {Directory.Exists(wwwrootPath)}");
+            
             if (Directory.Exists(wwwrootPath))
             {
                 var indexPath = Path.Combine(wwwrootPath, "index.html");
+                Console.WriteLine($"[MapFallback] index.html 路径: {indexPath}");
+                Console.WriteLine($"[MapFallback] index.html 存在: {File.Exists(indexPath)}");
+                
                 if (File.Exists(indexPath))
                 {
+                    Console.WriteLine($"[MapFallback] 返回 index.html");
                     context.Response.ContentType = "text/html; charset=utf-8";
                     await context.Response.SendFileAsync(indexPath);
                     return;
                 }
+                else
+                {
+                    Console.WriteLine($"[MapFallback] 错误: index.html 文件不存在");
+                }
+            }
+            else
+            {
+                Console.WriteLine($"[MapFallback] 错误: wwwroot 目录不存在");
             }
             
+            Console.WriteLine($"[MapFallback] 返回 404");
             context.Response.StatusCode = 404;
+            await context.Response.WriteAsync($"Page not found. wwwroot: {wwwrootPath}, exists: {Directory.Exists(wwwrootPath)}");
         });
 
         return app;

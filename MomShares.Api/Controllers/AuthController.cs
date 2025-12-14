@@ -74,14 +74,34 @@ public class AuthController : ControllerBase
         var holder = await _context.Holders
             .FirstOrDefaultAsync(h => h.Phone == request.Username);
 
-        if (holder == null || !_passwordService.VerifyPassword(request.Password, holder.PasswordHash))
+        if (holder == null)
         {
+            Console.WriteLine($"[HolderLogin] 持有人不存在: {request.Username}");
+            return Unauthorized(new { message = "手机号或密码错误" });
+        }
+
+        // 检查密码哈希是否为空（可能是旧数据）
+        if (string.IsNullOrWhiteSpace(holder.PasswordHash))
+        {
+            Console.WriteLine($"[HolderLogin] 持有人密码哈希为空: {holder.Id}");
+            return Unauthorized(new { message = "密码未设置，请联系管理员" });
+        }
+
+        // 验证密码
+        var isPasswordValid = _passwordService.VerifyPassword(request.Password, holder.PasswordHash);
+        Console.WriteLine($"[HolderLogin] 持有人ID: {holder.Id}, 手机号: {request.Username}, 密码验证: {isPasswordValid}");
+        
+        if (!isPasswordValid)
+        {
+            Console.WriteLine($"[HolderLogin] 密码验证失败，输入的密码长度: {request.Password?.Length ?? 0}");
             return Unauthorized(new { message = "手机号或密码错误" });
         }
 
         var token = _jwtTokenService.GenerateToken(holder.Id, holder.Phone, "Holder");
         var expirationMinutes = int.Parse(Request.HttpContext.RequestServices
             .GetRequiredService<IConfiguration>()["JwtSettings:ExpirationMinutes"] ?? "1440");
+
+        Console.WriteLine($"[HolderLogin] 登录成功: {holder.Name} (ID: {holder.Id})");
 
         return Ok(new LoginResponse
         {

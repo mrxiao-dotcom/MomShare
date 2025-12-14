@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -117,8 +118,8 @@ public partial class MainViewModel : ObservableObject
                 
                 try
                 {
-                    // 创建Web应用
-                    var urls = $"http://localhost:{ApiPort}";
+                    // 创建Web应用（监听所有网络接口，可通过IP地址访问）
+                    var urls = $"http://0.0.0.0:{ApiPort}";
                     _webApp = WebAppBuilder.CreateWebApplication(null, urls);
                 }
                 finally
@@ -131,7 +132,7 @@ public partial class MainViewModel : ObservableObject
             {
                 // 如果找不到API目录，使用当前目录
                 AddLog($"未找到API项目目录，使用当前目录: {currentDir}");
-                var urls = $"http://localhost:{ApiPort}";
+                var urls = $"http://0.0.0.0:{ApiPort}";
                 _webApp = WebAppBuilder.CreateWebApplication(null, urls);
             }
 
@@ -149,11 +150,38 @@ public partial class MainViewModel : ObservableObject
                     {
                         IsServiceRunning = true;
                         ServiceStatus = "运行中";
+                        
+                        // 获取本机IP地址
+                        var localIPs = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
+                            .Where(ni => ni.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up)
+                            .SelectMany(ni => ni.GetIPProperties().UnicastAddresses)
+                            .Where(addr => addr.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+                            .Select(addr => addr.Address.ToString())
+                            .Where(ip => !System.Net.IPAddress.IsLoopback(System.Net.IPAddress.Parse(ip)))
+                            .ToList();
+                        
                         AddLog("========================================");
                         AddLog("  份额管理系统 - Web服务器已启动");
                         AddLog("========================================");
-                        AddLog($"  管理界面: http://localhost:{ApiPort}");
+                        AddLog($"  本地访问: http://localhost:{ApiPort}");
+                        if (localIPs.Any())
+                        {
+                            foreach (var ip in localIPs)
+                            {
+                                AddLog($"  内网访问: http://{ip}:{ApiPort}");
+                            }
+                        }
+                        else
+                        {
+                            AddLog($"  内网访问: http://<服务器内网IP>:{ApiPort}");
+                        }
+                        AddLog($"  公网访问: http://<服务器公网IP>:{ApiPort}");
                         AddLog($"  API文档: http://localhost:{ApiPort}/swagger");
+                        AddLog("========================================");
+                        AddLog("  重要提示:");
+                        AddLog("  1. 确保Windows防火墙已开放端口 " + ApiPort);
+                        AddLog("  2. 如果是云服务器，请在安全组中开放端口 " + ApiPort);
+                        AddLog("  3. 使用公网IP访问时，确保端口映射正确");
                         AddLog("========================================");
                     });
 
