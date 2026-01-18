@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>期货工具箱</title>
+    <link rel="icon" href="/favicon.ico?v=2" type="image/x-icon">
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>期货工具箱</h1>
+
+        <!-- 工具箱按钮区域 -->
+        <div class="toolbox">
+            <button class="tool-btn active" onclick="showTool('risk')">风险金计算器</button>
+            <button class="tool-btn" onclick="showTool('pending')">功能待定</button>
+        </div>
+
+        <!-- 风险金计算器 -->
+        <div id="risk-calculator" class="tool-content">
+            <div class="calculator-section">
+                <h2>风险金计算器</h2>
+
+                <!-- 输入区域 -->
+                <div class="input-section">
+                    <div class="input-row">
+                        <div class="input-group">
+                            <label for="initialEquity">账户初始权益 (元)</label>
+                            <input type="number" id="initialEquity" step="0.01" placeholder="请输入初始权益">
+                        </div>
+                        <div class="input-group">
+                            <label for="currentEquity">当前权益 (元)</label>
+                            <input type="number" id="currentEquity" step="0.01" placeholder="请输入当前权益">
+                        </div>
+                    </div>
+
+                    <div class="input-row">
+                        <div class="input-group">
+                            <label for="initialNetValue">初始净值</label>
+                            <input type="number" id="initialNetValue" step="0.001" value="1.000" placeholder="默认为1.000">
+                        </div>
+                        <div class="input-group">
+                            <label for="currentNetValue">当前净值</label>
+                            <input type="number" id="currentNetValue" step="0.001" readonly placeholder="自动计算">
+                        </div>
+                    </div>
+
+                    <div class="input-row">
+                        <div class="input-group">
+                            <label for="defenseNetValue">防御净值</label>
+                            <input type="number" id="defenseNetValue" step="0.001" placeholder="请输入防御净值">
+                        </div>
+                        <div class="input-group">
+                            <label for="targetNetValue">目标净值</label>
+                            <input type="number" id="targetNetValue" step="0.001" placeholder="请输入目标净值">
+                        </div>
+                    </div>
+
+                    <div class="input-row">
+                        <div class="input-group">
+                            <label for="warningNetValue">预警净值</label>
+                            <input type="number" id="warningNetValue" step="0.001" placeholder="请输入预警净值">
+                        </div>
+                        <div class="input-group">
+                            <label for="riskLots">风险金笔数</label>
+                            <input type="number" id="riskLots" min="1" placeholder="请输入风险金笔数">
+                        </div>
+                    </div>
+
+                    <div class="button-row">
+                        <button class="btn btn-primary" onclick="calculateRisk()">计算</button>
+                        <button class="btn btn-secondary" onclick="clearInputs()">清空</button>
+                    </div>
+                </div>
+
+                <!-- 图表区域 -->
+                <div class="chart-section">
+                    <h3>净值风险图</h3>
+                    <canvas id="riskChart" width="800" height="400"></canvas>
+                </div>
+
+                <!-- 计算结果区域 -->
+                <div id="result-section" class="result-section" style="display: none;">
+                    <h3>计算结果</h3>
+                    <div class="result-summary">
+                        <div class="result-item">
+                            <span class="result-label">建议单笔：</span>
+                            <span class="result-value" id="suggestedLot">0.00 元</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">防御单笔：</span>
+                            <span class="result-value" id="defenseLot">0.00 元</span>
+                        </div>
+                    </div>
+
+                    <div class="formula-section">
+                        <h4>计算公式</h4>
+                        <div class="formula">
+                            <p><strong>建议单笔 = (当前权益 - 初始权益 × 预警净值) ÷ 风险金笔数</strong></p>
+                            <p><strong>防御单笔 = (min(当前权益, 预警净值 × 初始权益) - 防御净值 × 初始权益) ÷ 风险金笔数</strong></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 待定功能 -->
+        <div id="pending-tool" class="tool-content" style="display: none;">
+            <div class="calculator-section">
+                <h2>功能待定</h2>
+                <p>此功能正在开发中，敬请期待...</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="/futures.js"></script>
+</body>
+</html>
+
+

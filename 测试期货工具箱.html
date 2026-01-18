@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试期货工具箱</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .test-input {
+            margin: 10px 0;
+            padding: 8px;
+            width: 200px;
+        }
+        .test-btn {
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .test-btn:hover {
+            background: #0056b3;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>期货工具箱测试页面</h1>
+
+    <div class="test-section">
+        <h2>功能测试</h2>
+        <p>这个页面用于测试期货工具箱的基本功能。</p>
+
+        <div>
+            <button class="test-btn" onclick="openFuturesToolbox()">打开期货工具箱</button>
+        </div>
+
+        <div>
+            <label>服务器地址:</label>
+            <input type="text" id="serverUrl" class="test-input" value="http://localhost:5000" placeholder="服务器地址">
+        </div>
+
+        <div class="result" id="result">
+            点击上面的按钮测试期货工具箱功能
+        </div>
+    </div>
+
+    <script>
+        function openFuturesToolbox() {
+            const serverUrl = document.getElementById('serverUrl').value;
+            const futuresUrl = `${serverUrl}/futures`;
+
+            document.getElementById('result').innerHTML = `
+                <p>正在打开: <a href="${futuresUrl}" target="_blank">${futuresUrl}</a></p>
+                <p>如果页面无法打开，请检查：</p>
+                <ul>
+                    <li>服务器是否正在运行</li>
+                    <li>端口 5000 是否开放</li>
+                    <li>防火墙设置</li>
+                </ul>
+            `;
+
+            // 尝试在新窗口中打开
+            window.open(futuresUrl, '_blank');
+        }
+    </script>
+</body>
+</html>
+
+

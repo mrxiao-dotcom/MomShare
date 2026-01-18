@@ -421,7 +421,7 @@ async function apiCall(endpoint, options = {}) {
                     console.error('API返回了字符串而不是JSON对象:', endpoint, data.substring(0, 100));
                     throw new Error('API返回格式错误');
                 }
-                return data;
+            return data;
             } catch (parseError) {
                 console.error('JSON解析失败:', endpoint, text.substring(0, 200));
                 throw new Error('JSON解析失败: ' + parseError.message);
@@ -735,8 +735,8 @@ function addAllocationRow(container, holders, holderId = null, shareType = 'Subo
     row.style.alignItems = 'center';
     
     const holderOptions = holders.map(h => {
-        const id = h.Id || h.id;
-        const name = h.Name || h.name;
+                const id = h.Id || h.id;
+                const name = h.Name || h.name;
         const selected = holderId && id === holderId ? 'selected' : '';
         return `<option value="${id}" ${selected}>${name}</option>`;
     }).join('');
@@ -818,7 +818,7 @@ async function showAllocateModal(productId) {
             });
         } else {
             // 如果没有现有份额，添加一行空行
-            addAllocationRow(container, holders);
+        addAllocationRow(container, holders);
         }
 
         document.getElementById('addAllocationRowBtn').addEventListener('click', () => addAllocationRow(container, holders));

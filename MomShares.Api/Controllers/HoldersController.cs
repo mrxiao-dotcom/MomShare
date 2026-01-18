@@ -152,7 +152,13 @@ public class HoldersController : ControllerBase
         // 生成新的密码哈希
         var newPasswordHash = _passwordService.HashPassword(request.NewPassword);
         Console.WriteLine($"[ChangePassword] 新密码哈希长度: {newPasswordHash?.Length ?? 0}");
-        
+
+        if (string.IsNullOrEmpty(newPasswordHash))
+        {
+            Console.WriteLine($"[ChangePassword] 错误: 密码哈希生成失败");
+            return StatusCode(500, new { message = "密码加密失败，请重试" });
+        }
+
         // 验证新密码哈希是否有效（可以立即验证）
         var verifyTest = _passwordService.VerifyPassword(request.NewPassword, newPasswordHash);
         Console.WriteLine($"[ChangePassword] 密码哈希验证测试: {verifyTest}");

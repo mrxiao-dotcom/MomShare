@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Routing;
 using MomShares.Infrastructure;
 using MomShares.Infrastructure.Data;
 using System.Text.Json.Serialization;
+using MomShares.Api.Services;
 
 namespace MomShares.Api;
 
@@ -311,6 +312,10 @@ public static class WebAppBuilder
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen();
 
+        // 添加 HttpClient 与 定时刷新服务（用于自动刷新排行榜）
+        builder.Services.AddHttpClient();
+        builder.Services.AddHostedService<RankingsRefreshService>();
+
         var app = builder.Build();
 
         // 配置HTTP请求管道
@@ -381,7 +386,37 @@ public static class WebAppBuilder
 
         app.UseAuthentication();
         app.UseAuthorization();
-        
+
+        // 注意：暂时注释掉MapGet路由，避免与控制器冲突
+        /*
+        // 映射期货工具箱路由（不需要认证）
+        app.MapGet("/futures", async context =>
+        {
+            Console.WriteLine($"[MapGet Route] 处理 /futures 请求");
+
+            // 使用已经配置的wwwrootPath（从builder.Environment.WebRootPath获取）
+            var wwwrootPath = app.Environment.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+            var futuresPath = Path.Combine(wwwrootPath, "futures.html");
+
+            Console.WriteLine($"[MapGet Route] wwwroot: {wwwrootPath}");
+            Console.WriteLine($"[MapGet Route] futures.html 路径: {futuresPath}");
+            Console.WriteLine($"[MapGet Route] futures.html 存在: {File.Exists(futuresPath)}");
+
+            if (File.Exists(futuresPath))
+            {
+                Console.WriteLine($"[MapGet Route] 返回 futures.html");
+                context.Response.ContentType = "text/html; charset=utf-8";
+                await context.Response.SendFileAsync(futuresPath);
+            }
+            else
+            {
+                Console.WriteLine($"[MapGet Route] 错误: futures.html 文件不存在");
+                context.Response.StatusCode = 404;
+                await context.Response.WriteAsync("Futures toolbox page not found");
+            }
+        });
+        */
+
         // 先映射API路由
         app.MapControllers();
         
