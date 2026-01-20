@@ -1,0 +1,86 @@
+{
+  "longs": [
+    {
+      "symbol": "RB2505",
+      "score": 85.5
+    },
+    {
+      "symbol": "HC2505",
+      "score": 78.2
+    },
+    {
+      "symbol": "J2505",
+      "score": 72.1
+    },
+    {
+      "symbol": "JM2505",
+      "score": 68.9
+    },
+    {
+      "symbol": "ZC2505",
+      "score": 65.4
+    },
+    {
+      "symbol": "AP2505",
+      "score": 62.3
+    },
+    {
+      "symbol": "CF2505",
+      "score": 59.8
+    },
+    {
+      "symbol": "SR2505",
+      "score": 57.2
+    },
+    {
+      "symbol": "TA2505",
+      "score": 54.9
+    },
+    {
+      "symbol": "MA2505",
+      "score": 52.1
+    }
+  ],
+  "shorts": [
+    {
+      "symbol": "I2505",
+      "score": -72.3
+    },
+    {
+      "symbol": "P2505",
+      "score": -68.9
+    },
+    {
+      "symbol": "M2505",
+      "score": -65.4
+    },
+    {
+      "symbol": "RM2505",
+      "score": -62.1
+    },
+    {
+      "symbol": "OI2505",
+      "score": -58.7
+    },
+    {
+      "symbol": "Y2505",
+      "score": -55.3
+    },
+    {
+      "symbol": "C2505",
+      "score": -52.8
+    },
+    {
+      "symbol": "CS2505",
+      "score": -49.6
+    },
+    {
+      "symbol": "A2505",
+      "score": -47.2
+    },
+    {
+      "symbol": "B2505",
+      "score": -44.9
+    }
+  ]
+}

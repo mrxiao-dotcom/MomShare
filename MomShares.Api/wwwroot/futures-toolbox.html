@@ -535,7 +535,8 @@
         // 合约信息缓存
         let contractCache = {};
         // 前端可配置的 API 基础地址（从 wwwroot/app-config.json 加载）
-        let API_BASE = '';
+        let STRATEGIES_API_BASE = '';
+        let RANKINGS_API_BASE = '';
 
         // 加载前端配置（app-config.json），可用于切换后端服务器地址
         async function loadAppConfig() {
@@ -543,15 +544,21 @@
                 const resp = await fetch('/app-config.json', { cache: 'no-store' });
                 if (!resp.ok) {
                     console.log('app-config.json not found, using defaults');
-                    API_BASE = '';
+                    STRATEGIES_API_BASE = '';
+                    RANKINGS_API_BASE = '';
                     return;
                 }
                 const cfg = await resp.json();
-                API_BASE = (cfg && cfg.apiBaseUrl) ? cfg.apiBaseUrl.replace(/\/+$/,'') : '';
-                console.log('[app-config] API_BASE =', API_BASE);
+                // 向后兼容：如果有旧的 apiBaseUrl，用它作为默认值
+                const defaultBase = (cfg && cfg.apiBaseUrl) ? cfg.apiBaseUrl.replace(/\/+$/,'') : '';
+                STRATEGIES_API_BASE = (cfg && cfg.strategiesApiUrl) ? cfg.strategiesApiUrl.replace(/\/+$/,'') : defaultBase;
+                RANKINGS_API_BASE = (cfg && cfg.rankingsApiUrl) ? cfg.rankingsApiUrl.replace(/\/+$/,'') : defaultBase;
+                console.log('[app-config] STRATEGIES_API_BASE =', STRATEGIES_API_BASE);
+                console.log('[app-config] RANKINGS_API_BASE =', RANKINGS_API_BASE);
             } catch (e) {
                 console.log('loadAppConfig error', e);
-                API_BASE = '';
+                STRATEGIES_API_BASE = '';
+                RANKINGS_API_BASE = '';
             }
         }
 
@@ -1099,22 +1106,16 @@
             }
         }
 
-        // 加载榜单数据（优先通过 API /rankings，再降级到静态文件 /rankings.json）
+        // 加载榜单数据（直接使用静态文件，避免CORS和代理问题）
         async function loadRankings() {
             const errDiv = document.getElementById('rankingsError');
             errDiv.style.display = 'none';
             try {
-                const base = API_BASE || '';
-                let res = await fetch(`${base}/rankings`, { cache: 'no-store' });
-                let data;
-                if (!res.ok) {
-                    // 尝试静态文件
-                    res = await fetch(`${base}/rankings.json`, { cache: 'no-store' });
-                    if (!res.ok) throw new Error('无法获取榜单数据');
-                    data = await res.json();
-                } else {
-                    data = await res.json();
-                }
+                // 直接使用静态文件
+                const res = await fetch('/rankings.json', { cache: 'no-store' });
+                if (!res.ok) throw new Error('榜单文件不存在');
+
+                const data = await res.json();
                 renderRankings(data);
             } catch (e) {
                 errDiv.textContent = '加载榜单失败：' + e.message;
@@ -1198,7 +1199,7 @@
             err.style.display = 'none';
             container.innerHTML = '';
             try {
-                const base = API_BASE || '';
+                const base = STRATEGIES_API_BASE || '';
                 const res = await fetch(`${base}/api/strategies/list`);
                 if (!res.ok) throw new Error('无法获取策略列表');
                 const json = await res.json();
@@ -1265,7 +1266,7 @@
             const err = document.getElementById('strategiesError');
             err.style.display = 'none';
             try {
-                const base = API_BASE || '';
+                const base = STRATEGIES_API_BASE || '';
                 const res = await fetch(`${base}/api/strategies/${id}/summary`);
                 if (!res.ok) throw new Error('无法获取摘要');
                 const json = await res.json();
@@ -1282,7 +1283,7 @@
             const err = document.getElementById('strategiesError');
             err.style.display = 'none';
             try {
-                const base = API_BASE || '';
+                const base = STRATEGIES_API_BASE || '';
                 const res = await fetch(`${base}/api/strategies/${id}/html`);
                 if (!res.ok) throw new Error('无法获取明细HTML');
                 const html = await res.text();

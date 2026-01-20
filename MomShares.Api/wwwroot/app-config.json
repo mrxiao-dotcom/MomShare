@@ -1,5 +1,6 @@
 {
-  "apiBaseUrl": "http://185.242.235.85:8080/"
+  "strategiesApiUrl": "http://185.242.235.85:8080/",
+  "rankingsApiUrl": "http://82.157.17.88:8080/"
 }
 
 

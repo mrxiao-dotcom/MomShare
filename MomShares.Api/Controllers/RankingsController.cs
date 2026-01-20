@@ -1,8 +1,17 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Net.Http;
+using System.Threading.Tasks;
 
 namespace MomShares.Api.Controllers;
+
+/// <summary>
+/// 提供品种多空评分榜的读写接口和代理功能
+/// GET  /rankings  -> 返回本地 wwwroot/rankings.json 内容（如果存在）
+/// POST /rankings  -> 接受 JSON 数据并保存到 wwwroot/rankings.json
+/// GET  /rankings/proxy  -> 代理请求外部榜单API，避免CORS问题
+/// </summary>
 
 /// <summary>
 /// 提供品种多空评分榜的读写接口
@@ -72,6 +81,63 @@ public class RankingsController : ControllerBase
         catch (Exception ex)
         {
             return StatusCode(500, $"save rankings failed: {ex.Message}");
+        }
+    }
+
+    [HttpGet("proxy")]
+    public async Task<IActionResult> GetRankingsProxy()
+    {
+        try
+        {
+            // 从配置中获取外部API地址
+            var config = HttpContext.RequestServices.GetService<Microsoft.Extensions.Configuration.IConfiguration>();
+            var externalUrl = config?["RankingsSettings:AutoRefreshUrl"] ?? "";
+
+            if (string.IsNullOrWhiteSpace(externalUrl))
+            {
+                return BadRequest("external rankings API URL not configured");
+            }
+
+            // 使用HttpClient请求外部API
+            var httpClient = HttpContext.RequestServices.GetService<System.Net.Http.IHttpClientFactory>()?.CreateClient();
+            if (httpClient == null)
+            {
+                return StatusCode(500, "HTTP client not available");
+            }
+
+            var response = await httpClient.GetAsync(externalUrl);
+            if (!response.IsSuccessStatusCode)
+            {
+                return StatusCode((int)response.StatusCode, $"external API returned {response.StatusCode}");
+            }
+
+            var content = await response.Content.ReadAsStringAsync();
+
+            // 检查内容类型
+            var contentType = response.Content.Headers.ContentType?.MediaType ?? "";
+
+            // 如果是JSON，验证格式；如果是HTML或其他，直接返回
+            if (contentType.Contains("json") || content.TrimStart().StartsWith("{") || content.TrimStart().StartsWith("["))
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(content);
+                    return Content(content, "application/json");
+                }
+                catch (JsonException ex)
+                {
+                    return BadRequest($"invalid JSON from external API: {ex.Message}");
+                }
+            }
+            else
+            {
+                // 如果不是JSON，直接返回内容（可能是HTML或其他格式）
+                return Content(content, contentType);
+            }
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, $"proxy request failed: {ex.Message}");
         }
     }
 }
